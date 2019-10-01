@@ -1,0 +1,100 @@
+function main() {
+  
+  // お天気APIを読んで結果をもらう
+  const result = callWeatherAPI();
+  
+  // 正常にAPIから応答があるか
+  if (result.getResponseCode() !== 200) {
+    
+    // 異常があればメッセージを失敗を知らせるものにする
+    var message  = "何か失敗しました。レスポンスコード：" + result.getResponseCode();
+  
+  } else {
+    
+    // 正常ならデータをJSONにパース
+    var data =  JSON.parse(result.getContentText()).forecasts[0].telop;
+    
+    // 結果に雨という文字が含まれないなら何もせず中断する
+    if(data.split("").indexOf("雨") == -1) {
+      return;
+    }
+    
+    // メッセージを設定
+    var message = "今日は雨が降るかもしれません。\n\n予報：" + data;
+    
+  }
+  
+  // Slackへ送信
+  var slack_webhook = "YOUR_SLACK_WEBHOOK";  
+  sendToSlack(slack_webhook, message);
+  
+  // LINEへ送信
+  var line_access_token = "YOUR_ACCESS_TOKEN";
+  var line_to = "YOUR_LINE_TO";
+  sendToLine(line_access_token, line_to, message);
+
+}
+
+// *******************************************
+// Livedoorのお天気APIを叩いてレスポンスをもらう関数
+// *******************************************
+function callWeatherAPI() {
+  const response = UrlFetchApp.fetch(
+    "http://weather.livedoor.com/forecast/webservice/json/v1?city=400010", // TODO: set your city number
+    {
+      "method" : "get",
+      "headers" : {
+        "Content-Type": "application/json"
+      },
+      "muteHttpExceptions": true
+    }
+  );
+  return response;
+}
+
+
+// *******************************************
+// Slackボットへ送信する関数
+// *******************************************
+function sendToSlack(slackWebhook, message) {
+  UrlFetchApp.fetch(
+    slackWebhook, // TODO: set yours
+    {
+      "method" : "post",
+      "headers" : {
+        "Content-Type": "application/json"
+      },
+      "muteHttpExceptions": true,
+      "payload" : JSON.stringify({"text": message})
+    }
+  );
+}
+
+// *******************************************
+// LINEボットへ送信する関数
+// *******************************************
+function sendToLine(access_token, to, message) {
+  var url = "https://api.line.me/v2/bot/message/push";
+  var headers = {
+    "Content-Type" : "application/json; charset=UTF-8",
+    'Authorization': 'Bearer ' + access_token,
+  };
+
+  var postData = {
+    "to" : to,
+    "messages" : [
+      {
+        'type':'text',
+        'text': message,
+      }
+    ]
+  };
+
+  var options = {
+    "method" : "post",
+    "headers" : headers,
+    "payload" : JSON.stringify(postData)
+  };
+
+  return UrlFetchApp.fetch(url, options);
+}
